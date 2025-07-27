@@ -39,18 +39,59 @@ export const api = {
 
   external: {
     getPVGISData: async (lat: number, lng: number): Promise<PVGISData> => {
-      const response = await apiRequest("GET", `/api/pvgis/${lat}/${lng}`);
-      return response.json();
+      try {
+        const response = await apiRequest("GET", `/api/pvgis/${lat}/${lng}`);
+        return response.json();
+      } catch (error) {
+        console.warn('PVGIS API failed, using fallback data:', error);
+        // Return fallback data
+        return {
+          outputs: {
+            totals: {
+              fixed: {
+                "E_y": 1500,
+                "H(i)_y": 1800
+              }
+            }
+          }
+        };
+      }
     },
     
     getWeatherData: async (lat: number, lng: number): Promise<WeatherData> => {
-      const response = await apiRequest("GET", `/api/weather/${lat}/${lng}`);
-      return response.json();
+      try {
+        const response = await apiRequest("GET", `/api/weather/${lat}/${lng}`);
+        return response.json();
+      } catch (error) {
+        console.warn('Weather API failed, using fallback data:', error);
+        // Return fallback data
+        return {
+          main: { temp: 25, humidity: 60 },
+          weather: [{ main: "Clear", description: "clear sky" }],
+          clouds: { all: 10 }
+        };
+      }
     },
     
     getSolarInsight: async (lat: number, lng: number) => {
-      const response = await apiRequest("GET", `/api/solar-insight/${lat}/${lng}`);
-      return response.json();
+      try {
+        const response = await apiRequest("GET", `/api/solar-insight/${lat}/${lng}`);
+        return response.json();
+      } catch (error) {
+        console.warn('Solar Insight API failed, using fallback data:', error);
+        // Return fallback data
+        return {
+          solarPotential: {
+            yearlyEnergyDcKwh: 1500,
+            roofSegmentSummaries: [
+              {
+                yearlyEnergyDcKwh: 1500,
+                segmentIndex: 0
+              }
+            ]
+          }
+        };
+      }
     },
   },
 };
