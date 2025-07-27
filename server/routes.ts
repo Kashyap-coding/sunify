@@ -64,72 +64,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/pvgis/:lat/:lng", async (req, res) => {
     try {
       const { lat, lng } = req.params;
-      const url = `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${lat}&lon=${lng}&raddatabase=PVGIS-SARAH2&browser=0&outputformat=json`;
-      console.log(`Making PVGIS API request to: ${url}`);
-      
-      const response = await axios.get(url, { timeout: 15000 });
+      const response = await axios.get(
+        `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${lat}&lon=${lng}&raddatabase=PVGIS-SARAH2&browser=0&outputformat=json`
+      );
       res.json(response.data);
-    } catch (error: any) {
-      console.error("PVGIS API error:", error.response?.data || error.message);
-      res.status(500).json({ 
-        error: "Failed to fetch PVGIS data",
-        details: error.response?.data || error.message,
-        status: error.response?.status
-      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch PVGIS data" });
     }
   });
 
   app.get("/api/weather/:lat/:lng", async (req, res) => {
     try {
       const { lat, lng } = req.params;
-      const apiKey = process.env.OPENWEATHER_API_KEY;
-      
-      if (!apiKey || apiKey === "demo_key") {
-        return res.status(400).json({ 
-          error: "OpenWeather API key not configured", 
-          details: "Please provide a valid OPENWEATHER_API_KEY" 
-        });
-      }
-
-      const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${apiKey}&units=metric`;
-      console.log(`Making weather API request to: ${url.replace(apiKey, '[API_KEY]')}`);
-      
-      const response = await axios.get(url, { timeout: 10000 });
+      const apiKey = process.env.OPENWEATHER_API_KEY || process.env.VITE_OPENWEATHER_API_KEY || "demo_key";
+      const response = await axios.get(
+        `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${apiKey}&units=metric`
+      );
       res.json(response.data);
-    } catch (error: any) {
-      console.error("Weather API error:", error.response?.data || error.message);
-      res.status(500).json({ 
-        error: "Failed to fetch weather data",
-        details: error.response?.data?.message || error.message,
-        status: error.response?.status
-      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch weather data" });
     }
   });
 
   app.get("/api/solar-insight/:lat/:lng", async (req, res) => {
     try {
       const { lat, lng } = req.params;
-      const apiKey = process.env.GOOGLE_SOLAR_API_KEY;
-      
-      if (!apiKey || apiKey === "demo_key") {
-        return res.status(400).json({ 
-          error: "Google Solar API key not configured", 
-          details: "Please provide a valid GOOGLE_SOLAR_API_KEY" 
-        });
-      }
-
-      const url = `https://solar.googleapis.com/v1/buildingInsights:findClosest?location.latitude=${lat}&location.longitude=${lng}&key=${apiKey}`;
-      console.log(`Making Google Solar API request to: ${url.replace(apiKey, '[API_KEY]')}`);
-      
-      const response = await axios.get(url, { timeout: 15000 });
+      const apiKey = process.env.GOOGLE_SOLAR_API_KEY || process.env.VITE_GOOGLE_SOLAR_API_KEY || "demo_key";
+      const response = await axios.get(
+        `https://solar.googleapis.com/v1/buildingInsights:findClosest?location.latitude=${lat}&location.longitude=${lng}&key=${apiKey}`
+      );
       res.json(response.data);
-    } catch (error: any) {
-      console.error("Google Solar API error:", error.response?.data || error.message);
-      res.status(500).json({ 
-        error: "Failed to fetch Google Solar data",
-        details: error.response?.data?.error?.message || error.message,
-        status: error.response?.status
-      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch Google Solar data" });
     }
   });
 
