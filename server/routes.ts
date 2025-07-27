@@ -73,10 +73,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid coordinates" });
       }
       
-      // Use the correct PVGIS API endpoint
+      // Use the correct PVGIS API endpoint with proper parameters
       const response = await axios.get(
-        `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${latitude}&lon=${longitude}&raddatabase=PVGIS-SARAH2&browser=0&outputformat=json&peakpower=1&loss=14`,
+        `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc`,
         {
+          params: {
+            lat: latitude,
+            lon: longitude,
+            raddatabase: 'PVGIS-SARAH2',
+            browser: 0,
+            outputformat: 'json',
+            peakpower: 1,
+            loss: 14,
+            mountingplace: 'free',
+            angle: 35,
+            aspect: 0
+          },
           timeout: 10000,
           headers: {
             'User-Agent': 'Karnataka Solar Monitor'

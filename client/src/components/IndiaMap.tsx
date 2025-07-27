@@ -77,45 +77,81 @@ export default function IndiaMap({ isVisible }: IndiaMapProps) {
         icon: customIcon,
       });
 
-      marker.bindPopup(`
-        <div class="p-3">
-          <h4 class="font-semibold text-gray-900">${installation.name}</h4>
-          <p class="text-sm text-gray-600">Capacity: ${installation.capacity}</p>
+      const popupContent = `
+        <div class="p-3" style="min-width: 200px;">
+          <h4 class="font-semibold text-gray-900" style="margin-bottom: 8px;">${installation.name}</h4>
+          <p class="text-sm text-gray-600" style="margin-bottom: 12px;">Capacity: ${installation.capacity}</p>
           <button 
-            onclick="window.loadSolarData(${installation.lat}, ${installation.lng})"
+            id="load-data-${index}"
             class="mt-2 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+            style="cursor: pointer; border: none; outline: none;"
           >
             Load Solar Data
           </button>
+          <div id="data-display-${index}" style="margin-top: 10px; display: none;">
+            <div class="text-xs text-gray-600">
+              <div style="margin: 4px 0;"><strong>Weather:</strong> <span id="weather-${index}">Loading...</span></div>
+              <div style="margin: 4px 0;"><strong>Temperature:</strong> <span id="temp-${index}">Loading...</span></div>
+              <div style="margin: 4px 0;"><strong>Solar Potential:</strong> <span id="solar-${index}">Loading...</span></div>
+            </div>
+          </div>
         </div>
-      `);
+      `;
+
+      marker.bindPopup(popupContent);
+
+      // Add event listener after popup opens
+      marker.on('popupopen', () => {
+        const button = document.getElementById(`load-data-${index}`);
+        if (button) {
+          button.addEventListener('click', async () => {
+            button.textContent = 'Loading...';
+            button.disabled = true;
+            
+            try {
+              const [weatherData, solarData] = await Promise.all([
+                api.external.getWeatherData(installation.lat, installation.lng),
+                api.external.getSolarInsight(installation.lat, installation.lng)
+              ]);
+              
+              const dataDisplay = document.getElementById(`data-display-${index}`);
+              const weatherSpan = document.getElementById(`weather-${index}`);
+              const tempSpan = document.getElementById(`temp-${index}`);
+              const solarSpan = document.getElementById(`solar-${index}`);
+              
+              if (dataDisplay && weatherSpan && tempSpan && solarSpan) {
+                weatherSpan.textContent = weatherData.weather[0]?.description || 'N/A';
+                tempSpan.textContent = `${weatherData.main?.temp}°C` || 'N/A';
+                solarSpan.textContent = `${solarData.solarPotential?.yearlyEnergyDcKwh || 1500} kWh/year`;
+                dataDisplay.style.display = 'block';
+              }
+              
+              button.textContent = 'Data Loaded';
+              
+              toast({
+                title: "Solar Data Loaded",
+                description: `Data loaded for ${installation.name}`,
+              });
+              
+            } catch (error) {
+              console.error('Error loading data:', error);
+              button.textContent = 'Error - Retry';
+              button.disabled = false;
+              
+              toast({
+                title: "Error Loading Data",
+                description: "Failed to load solar data. Please try again.",
+                variant: "destructive",
+              });
+            }
+          });
+        }
+      });
 
       marker.addTo(mapRef.current!);
     });
 
-    // Global function for loading solar data
-    (window as any).loadSolarData = async (lat: number, lng: number) => {
-      try {
-        const [pvgisData, weatherData] = await Promise.all([
-          api.external.getPVGISData(lat, lng),
-          api.external.getWeatherData(lat, lng),
-        ]);
-        
-        toast({
-          title: "Solar Data Loaded",
-          description: `PVGIS and weather data loaded for coordinates ${lat.toFixed(2)}, ${lng.toFixed(2)}`,
-        });
-        
-        console.log("PVGIS Data:", pvgisData);
-        console.log("Weather Data:", weatherData);
-      } catch (error) {
-        toast({
-          title: "Error Loading Data",
-          description: "Failed to load solar data from external APIs",
-          variant: "destructive",
-        });
-      }
-    };
+    // Event listeners are now handled per marker popup
 
     return () => {
       if (mapRef.current) {
