@@ -14,7 +14,7 @@ interface SolarDataTableProps {
 export default function SolarDataTable({ installations, onRefresh, isLoading }: SolarDataTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-  
+
   const totalPages = Math.ceil(installations.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
@@ -99,7 +99,7 @@ export default function SolarDataTable({ installations, onRefresh, isLoading }: 
           </div>
         </div>
       </div>
-      
+
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
@@ -110,6 +110,7 @@ export default function SolarDataTable({ installations, onRefresh, isLoading }: 
               <TableHead className="text-left">Solar Energy Usage</TableHead>
               <TableHead className="text-left">Surface Area</TableHead>
               <TableHead className="text-left">Cost per m²</TableHead>
+              <TableHead className="text-left">Total Savings</TableHead>
               <TableHead className="text-left">Status</TableHead>
             </TableRow>
           </TableHeader>
@@ -150,6 +151,9 @@ export default function SolarDataTable({ installations, onRefresh, isLoading }: 
                 <TableCell>
                   <div className="text-sm font-mono text-gray-900">₹{installation.costPerSquareMeter.toLocaleString()}</div>
                   <div className="text-xs text-gray-500">Installation cost</div>
+                </TableCell>
+                <TableCell className="text-green-600 font-medium">
+                  ₹{(installation.annualMoneySaved + (installation.annualElectricitySaved * 5)).toLocaleString()}
                 </TableCell>
                 <TableCell>
                   {getStatusBadge(installation.status, installation.isOnline || false)}
