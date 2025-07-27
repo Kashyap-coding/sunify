@@ -113,25 +113,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Validate and store Arduino data
           const reading = insertSolarReadingSchema.parse({
             deviceId: message.deviceId,
+            location: message.location,
             power: message.power,
             voltage: message.voltage,
             current: message.current,
             irradiance: message.irradiance,
+            panelAngle: message.panelAngle,
+            sunlightIntensity: message.sunlightIntensity,
             temperature: message.temperature,
           });
 
           await storage.addReading(reading);
 
           // Update installation status
-          const installation = await storage.getInstallationByDeviceId(message.deviceId);
+          let installation = await storage.getInstallationByDeviceId(message.deviceId);
           if (installation) {
             await storage.updateInstallation(installation.id, {
               currentPower: message.power,
               voltage: message.voltage,
               current: message.current,
               irradiance: message.irradiance,
+              panelAngle: message.panelAngle,
+              sunlightIntensity: message.sunlightIntensity,
               isOnline: true,
               lastUpdate: new Date(),
+            });
+          } else {
+            // Create new installation if device doesn't exist
+            const newInstallation = await storage.createInstallation({
+              deviceId: message.deviceId,
+              location: message.location || "Arduino Device Location",
+              district: message.district || "Unknown District",
+              state: "Karnataka",
+              latitude: message.latitude || 15.3173,
+              longitude: message.longitude || 75.7139,
+              annualMoneySaved: 0,
+              annualElectricitySaved: 0,
+              annualSolarEnergyUsage: 0,
+              surfaceArea: 0,
+              costPerSquareMeter: 0,
+              currentPower: message.power,
+              voltage: message.voltage,
+              current: message.current,
+              irradiance: message.irradiance,
+              panelAngle: message.panelAngle,
+              sunlightIntensity: message.sunlightIntensity,
+              status: "active",
+              isOnline: true,
             });
           }
 

@@ -8,6 +8,7 @@ import KarnatakaMap from "@/components/KarnatakaMap";
 import IndiaMap from "@/components/IndiaMap";
 import SolarDataTable from "@/components/SolarDataTable";
 import ArduinoStatus from "@/components/ArduinoStatus";
+import ArduinoConnectionGuide from "@/components/ArduinoConnectionGuide";
 import { SolarInstallation } from "@shared/schema";
 
 export default function Home() {
@@ -80,8 +81,10 @@ export default function Home() {
             </div>
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-secondary rounded-full animate-pulse"></div>
-                <span className="text-sm text-gray-600">Arduino Connected</span>
+                <div className={`w-3 h-3 rounded-full ${karnatakaStats.activeDevices > 0 ? 'bg-secondary animate-pulse' : 'bg-gray-300'}`}></div>
+                <span className="text-sm text-gray-600">
+                  {karnatakaStats.activeDevices} Arduino Device{karnatakaStats.activeDevices !== 1 ? 's' : ''} Connected
+                </span>
               </div>
               <div className="text-sm text-gray-500">
                 <span>{formatTime(currentTime)}</span>
@@ -239,12 +242,13 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Arduino Status */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
+      {/* Arduino Status and Connection Guide */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 space-y-6">
         <ArduinoStatus
           installations={installations}
           onRefresh={() => refetch()}
         />
+        {installations.length === 0 && <ArduinoConnectionGuide />}
       </div>
     </div>
   );

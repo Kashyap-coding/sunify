@@ -26,6 +26,8 @@ export const solarInstallations = pgTable("solar_installations", {
   voltage: real("voltage").default(0),
   current: real("current").default(0),
   irradiance: real("irradiance").default(0),
+  panelAngle: real("panel_angle").default(0),
+  sunlightIntensity: real("sunlight_intensity").default(0),
   status: text("status").notNull().default("active"),
   lastUpdate: timestamp("last_update").defaultNow(),
   isOnline: boolean("is_online").default(false),
@@ -35,10 +37,13 @@ export const solarReadings = pgTable("solar_readings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   deviceId: text("device_id").notNull(),
   timestamp: timestamp("timestamp").defaultNow(),
+  location: text("location").notNull(),
   power: real("power").notNull(),
   voltage: real("voltage").notNull(),
   current: real("current").notNull(),
   irradiance: real("irradiance").notNull(),
+  panelAngle: real("panel_angle").notNull(),
+  sunlightIntensity: real("sunlight_intensity").notNull(),
   temperature: real("temperature"),
 });
 

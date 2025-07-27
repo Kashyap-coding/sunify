@@ -165,6 +165,14 @@ export default function ArduinoStatus({ installations, onRefresh }: ArduinoStatu
                           <span className="text-gray-600">Irradiance:</span>
                           <span className="font-medium font-mono">{installation.irradiance} W/m²</span>
                         </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Panel Angle:</span>
+                          <span className="font-medium font-mono">{installation.panelAngle?.toFixed(1)}°</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Sunlight Intensity:</span>
+                          <span className="font-medium font-mono">{installation.sunlightIntensity?.toFixed(1)} lux</span>
+                        </div>
                       </>
                     )}
                   </div>
@@ -186,7 +194,20 @@ export default function ArduinoStatus({ installations, onRefresh }: ArduinoStatu
         {installations.length === 0 && (
           <div className="text-center py-8 text-gray-500">
             <Search className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-            <p>No Arduino devices found. Click "Scan for Devices" to search for connected devices.</p>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Arduino Devices Connected</h3>
+            <p className="text-gray-500 mb-4">Connect your Arduino device to start monitoring solar data</p>
+            <div className="max-w-md mx-auto text-left">
+              <h4 className="font-medium text-gray-700 mb-2">Required sensor readings:</h4>
+              <ul className="text-sm text-gray-600 space-y-1">
+                <li>• Location coordinates</li>
+                <li>• Solar irradiance (W/m²)</li>
+                <li>• Panel angle (degrees)</li>
+                <li>• Power output (W)</li>
+                <li>• Sunlight intensity (lux)</li>
+                <li>• Voltage (V)</li>
+                <li>• Current (A)</li>
+              </ul>
+            </div>
           </div>
         )}
       </CardContent>

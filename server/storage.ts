@@ -36,75 +36,8 @@ export class MemStorage implements IStorage {
   }
 
   private initializeSampleData() {
-    const sampleInstallations: InsertSolarInstallation[] = [
-      {
-        deviceId: "DEVICE_001",
-        location: "Community Solar Park A",
-        district: "Bengaluru Urban",
-        state: "Karnataka",
-        latitude: 12.9716,
-        longitude: 77.5946,
-        annualMoneySaved: 285400,
-        annualElectricitySaved: 42800,
-        annualSolarEnergyUsage: 38520,
-        surfaceArea: 450,
-        costPerSquareMeter: 15200,
-        currentPower: 12.5,
-        voltage: 24.8,
-        current: 0.5,
-        irradiance: 850,
-        status: "active",
-        isOnline: true,
-      },
-      {
-        deviceId: "DEVICE_002",
-        location: "Rural Installation B",
-        district: "Mysuru",
-        state: "Karnataka",
-        latitude: 12.2958,
-        longitude: 76.6394,
-        annualMoneySaved: 142700,
-        annualElectricitySaved: 21400,
-        annualSolarEnergyUsage: 19260,
-        surfaceArea: 225,
-        costPerSquareMeter: 14800,
-        currentPower: 6.2,
-        voltage: 24.1,
-        current: 0.26,
-        irradiance: 780,
-        status: "active",
-        isOnline: true,
-      },
-      {
-        deviceId: "DEVICE_003",
-        location: "Coastal Solar Farm C",
-        district: "Mangaluru",
-        state: "Karnataka",
-        latitude: 12.9141,
-        longitude: 74.8560,
-        annualMoneySaved: 375200,
-        annualElectricitySaved: 56280,
-        annualSolarEnergyUsage: 50652,
-        surfaceArea: 590,
-        costPerSquareMeter: 16500,
-        currentPower: 15.8,
-        voltage: 25.2,
-        current: 0.63,
-        irradiance: 920,
-        status: "maintenance",
-        isOnline: false,
-      },
-    ];
-
-    sampleInstallations.forEach(installation => {
-      const id = randomUUID();
-      const fullInstallation: SolarInstallation = {
-        ...installation,
-        id,
-        lastUpdate: new Date(),
-      };
-      this.installations.set(id, fullInstallation);
-    });
+    // Start with no devices - wait for user's Arduino to connect
+    console.log("Storage initialized - waiting for Arduino devices to connect");
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -156,6 +89,7 @@ export class MemStorage implements IStorage {
       ...installation,
       id,
       lastUpdate: new Date(),
+      state: installation.state || "Karnataka",
     };
     this.installations.set(id, fullInstallation);
     return fullInstallation;
@@ -180,6 +114,7 @@ export class MemStorage implements IStorage {
       ...reading,
       id,
       timestamp: new Date(),
+      temperature: reading.temperature || null,
     };
     this.readings.set(id, fullReading);
     return fullReading;
