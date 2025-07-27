@@ -3,32 +3,49 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
-import { Satellite, Globe, CloudSun } from "lucide-react";
+import { Satellite, Globe, CloudSun, MapPin, TrendingUp, Zap, Leaf } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { INDIA_STATES, calculateAnnualSavings, SOLAR_CONSTANTS, type IndiaState } from "@shared/indiaStates";
 
 interface IndiaMapProps {
   isVisible: boolean;
 }
 
+interface StateData {
+  state: IndiaState;
+  weatherData?: any;
+  pvgisData?: any;
+  solarInsight?: any;
+  savings?: ReturnType<typeof calculateAnnualSavings>;
+  isLoading: boolean;
+}
+
 export default function IndiaMap({ isVisible }: IndiaMapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const markersRef = useRef<L.LayerGroup>(new L.LayerGroup());
+  const [selectedState, setSelectedState] = useState<StateData | null>(null);
+  const [stateDataMap, setStateDataMap] = useState<Map<string, StateData>>(new Map());
   const [showPVGIS, setShowPVGIS] = useState(true);
   const [showGoogleSolar, setShowGoogleSolar] = useState(true);
   const [showWeather, setShowWeather] = useState(true);
-  const [nationalStats, setNationalStats] = useState({
-    capacity: "75.2 GW",
-    target: "500 GW",
-    avgIrradiance: "5.2 kWh/m²",
-    peakMonth: "May",
-    optimalTilt: "23°",
-    variability: "±15%",
-    cloudCover: "25%",
-    uvIndex: "8.2",
-    forecastProduction: "85% Normal",
-  });
+  const [isLoadingApis, setIsLoadingApis] = useState(false);
   const { toast } = useToast();
+
+  // Initialize state data
+  useEffect(() => {
+    const initialStateDataMap = new Map<string, StateData>();
+    INDIA_STATES.forEach(state => {
+      initialStateDataMap.set(state.name, {
+        state,
+        savings: calculateAnnualSavings(state.averageSolarIrradiance),
+        isLoading: false
+      });
+    });
+    setStateDataMap(initialStateDataMap);
+  }, []);
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current || !isVisible) return;
@@ -41,81 +58,8 @@ export default function IndiaMap({ isVisible }: IndiaMapProps) {
       attribution: '© OpenStreetMap contributors',
     }).addTo(mapRef.current);
 
-    // Add sample markers for major solar installations
-    const majorInstallations = [
-      { name: "Rajasthan Solar Park", lat: 27.0238, lng: 74.2179, capacity: "18.4 GW" },
-      { name: "Karnataka Solar", lat: 15.3173, lng: 75.7139, capacity: "8.8 GW" },
-      { name: "Tamil Nadu Solar", lat: 11.1271, lng: 78.6569, capacity: "5.6 GW" },
-      { name: "Gujarat Solar", lat: 23.0225, lng: 72.5714, capacity: "4.2 GW" },
-    ];
-
-    majorInstallations.forEach((installation, index) => {
-      const colors = ["#2563EB", "#10B981", "#F59E0B", "#EF4444"];
-      
-      const customIcon = L.divIcon({
-        html: `
-          <div style="
-            background-color: ${colors[index]};
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            border: 3px solid white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          ">
-            <i class="fas fa-solar-panel" style="color: white; font-size: 10px;"></i>
-          </div>
-        `,
-        className: "custom-div-icon",
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-      });
-
-      const marker = L.marker([installation.lat, installation.lng], {
-        icon: customIcon,
-      });
-
-      marker.bindPopup(`
-        <div class="p-3">
-          <h4 class="font-semibold text-gray-900">${installation.name}</h4>
-          <p class="text-sm text-gray-600">Capacity: ${installation.capacity}</p>
-          <button 
-            onclick="window.loadSolarData(${installation.lat}, ${installation.lng})"
-            class="mt-2 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
-          >
-            Load Solar Data
-          </button>
-        </div>
-      `);
-
-      marker.addTo(mapRef.current!);
-    });
-
-    // Global function for loading solar data
-    (window as any).loadSolarData = async (lat: number, lng: number) => {
-      try {
-        const [pvgisData, weatherData] = await Promise.all([
-          api.external.getPVGISData(lat, lng),
-          api.external.getWeatherData(lat, lng),
-        ]);
-        
-        toast({
-          title: "Solar Data Loaded",
-          description: `PVGIS and weather data loaded for coordinates ${lat.toFixed(2)}, ${lng.toFixed(2)}`,
-        });
-        
-        console.log("PVGIS Data:", pvgisData);
-        console.log("Weather Data:", weatherData);
-      } catch (error) {
-        toast({
-          title: "Error Loading Data",
-          description: "Failed to load solar data from external APIs",
-          variant: "destructive",
-        });
-      }
-    };
+    // Add markers layer group
+    markersRef.current.addTo(mapRef.current);
 
     return () => {
       if (mapRef.current) {
@@ -123,31 +67,223 @@ export default function IndiaMap({ isVisible }: IndiaMapProps) {
         mapRef.current = null;
       }
     };
-  }, [isVisible, toast]);
+  }, [isVisible]);
+
+  // Add state markers
+  useEffect(() => {
+    if (!mapRef.current || !isVisible) return;
+
+    // Clear existing markers
+    markersRef.current.clearLayers();
+
+    INDIA_STATES.forEach((state) => {
+      const stateData = stateDataMap.get(state.name);
+      if (!stateData) return;
+
+      const potentialColors = {
+        'High': '#10B981',
+        'Medium': '#F59E0B', 
+        'Low': '#EF4444'
+      };
+
+      const customIcon = L.divIcon({
+        html: `
+          <div style="
+            background-color: ${potentialColors[state.solarPotential]};
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+          ">
+            <i class="fas fa-solar-panel" style="color: white; font-size: 12px;"></i>
+          </div>
+        `,
+        className: "custom-div-icon",
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+      });
+
+      const marker = L.marker([state.latitude, state.longitude], {
+        icon: customIcon,
+      });
+
+      marker.bindPopup(`
+        <div class="p-3 min-w-64">
+          <h4 class="font-semibold text-gray-900 mb-2">${state.name}</h4>
+          <p class="text-sm text-gray-600 mb-2">Capital: ${state.capital}</p>
+          <div class="space-y-2 text-xs">
+            <div class="flex justify-between">
+              <span>Solar Potential:</span>
+              <span class="font-medium" style="color: ${potentialColors[state.solarPotential]}">${state.solarPotential}</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Avg. Irradiance:</span>
+              <span class="font-medium">${state.averageSolarIrradiance} kWh/m²/day</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Estimated Capacity:</span>
+              <span class="font-medium">${state.estimatedCapacity.toLocaleString()} MW</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Annual Savings (5kW):</span>
+              <span class="font-medium text-green-600">₹${stateData.savings?.annualMoneySaved.toLocaleString()}</span>
+            </div>
+          </div>
+          <button 
+            onclick="window.loadStateData('${state.name}')"
+            class="mt-3 w-full px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+          >
+            Load Detailed Analytics
+          </button>
+        </div>
+      `);
+
+      marker.on('click', () => {
+        const currentStateData = stateDataMap.get(state.name);
+        if (currentStateData) {
+          setSelectedState(currentStateData);
+        }
+      });
+
+      marker.addTo(markersRef.current);
+    });
+
+    // Global function for loading state data
+    (window as any).loadStateData = async (stateName: string) => {
+      const state = INDIA_STATES.find(s => s.name === stateName);
+      if (!state) return;
+
+      setIsLoadingApis(true);
+      
+      // Update state data to show loading
+      setStateDataMap(prev => {
+        const updated = new Map(prev);
+        const stateData = updated.get(stateName);
+        if (stateData) {
+          updated.set(stateName, { ...stateData, isLoading: true });
+        }
+        return updated;
+      });
+
+      try {
+        const [pvgisData, weatherData, solarInsight] = await Promise.allSettled([
+          showPVGIS ? api.external.getPVGISData(state.latitude, state.longitude) : Promise.resolve(null),
+          showWeather ? api.external.getWeatherData(state.latitude, state.longitude) : Promise.resolve(null),
+          showGoogleSolar ? api.external.getSolarInsight(state.latitude, state.longitude) : Promise.resolve(null)
+        ]);
+
+        // Update state data with API results
+        setStateDataMap(prev => {
+          const updated = new Map(prev);
+          const stateData = updated.get(stateName);
+          if (stateData) {
+            updated.set(stateName, {
+              ...stateData,
+              weatherData: weatherData.status === 'fulfilled' ? weatherData.value : null,
+              pvgisData: pvgisData.status === 'fulfilled' ? pvgisData.value : null,
+              solarInsight: solarInsight.status === 'fulfilled' ? solarInsight.value : null,
+              isLoading: false
+            });
+            
+            // Update selected state if this is the current selection
+            const updatedStateData = updated.get(stateName);
+            if (selectedState?.state.name === stateName && updatedStateData) {
+              setSelectedState(updatedStateData);
+            }
+          }
+          return updated;
+        });
+
+        toast({
+          title: "State Data Loaded",
+          description: `Loaded comprehensive data for ${stateName}`,
+        });
+        
+      } catch (error) {
+        toast({
+          title: "Error Loading Data",
+          description: `Failed to load some data for ${stateName}`,
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingApis(false);
+      }
+    };
+
+  }, [isVisible, stateDataMap, showPVGIS, showWeather, showGoogleSolar, selectedState, toast]);
 
   const togglePVGIS = () => setShowPVGIS(!showPVGIS);
   const toggleGoogleSolar = () => setShowGoogleSolar(!showGoogleSolar);
   const toggleWeather = () => setShowWeather(!showWeather);
 
+  const formatMoney = (amount: number) => {
+    if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(1)} Cr`;
+    if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)} L`;
+    return `₹${amount.toLocaleString()}`;
+  };
+
   if (!isVisible) return null;
 
+  const nationalStats = {
+    totalCapacity: INDIA_STATES.reduce((sum, state) => sum + state.estimatedCapacity, 0),
+    avgIrradiance: (INDIA_STATES.reduce((sum, state) => sum + state.averageSolarIrradiance, 0) / INDIA_STATES.length).toFixed(1),
+    highPotentialStates: INDIA_STATES.filter(state => state.solarPotential === 'High').length,
+    totalSavings: INDIA_STATES.reduce((sum, state) => {
+      const savings = calculateAnnualSavings(state.averageSolarIrradiance);
+      return sum + savings.annualMoneySaved;
+    }, 0)
+  };
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* India Map Section */}
-      <div>
+      <div className="lg:col-span-2">
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-            <h3 className="text-lg font-semibold text-gray-900">India Solar Irradiance Map</h3>
-            <p className="text-sm text-gray-600">PVGIS & Google Solar API Integration</p>
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">India State-wise Solar Map</h3>
+                <p className="text-sm text-gray-600">Click on state markers for detailed analytics</p>
+              </div>
+              {isLoadingApis && (
+                <Badge variant="secondary" className="animate-pulse">
+                  Loading APIs...
+                </Badge>
+              )}
+            </div>
           </div>
           <div className="relative">
             <div ref={mapContainerRef} className="h-96" />
             
+            {/* Legend */}
+            <div className="absolute bottom-4 right-4 bg-white p-3 rounded-lg shadow-md border border-gray-200">
+              <h4 className="text-xs font-medium text-gray-900 mb-2">Solar Potential</h4>
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span className="text-xs text-gray-600">High</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                  <span className="text-xs text-gray-600">Medium</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                  <span className="text-xs text-gray-600">Low</span>
+                </div>
+              </div>
+            </div>
+
             {/* API Status Indicators */}
             <div className="absolute top-4 left-4 space-y-2">
               <div className={`bg-white px-3 py-1 rounded-full shadow-md border border-gray-200 flex items-center space-x-2 ${showPVGIS ? 'opacity-100' : 'opacity-50'}`}>
                 <div className="w-2 h-2 bg-secondary rounded-full"></div>
-                <span className="text-xs text-gray-600">PVGIS API</span>
+                <span className="text-xs text-gray-600">PVGIS</span>
               </div>
               <div className={`bg-white px-3 py-1 rounded-full shadow-md border border-gray-200 flex items-center space-x-2 ${showGoogleSolar ? 'opacity-100' : 'opacity-50'}`}>
                 <div className="w-2 h-2 bg-primary rounded-full"></div>
@@ -155,7 +291,7 @@ export default function IndiaMap({ isVisible }: IndiaMapProps) {
               </div>
               <div className={`bg-white px-3 py-1 rounded-full shadow-md border border-gray-200 flex items-center space-x-2 ${showWeather ? 'opacity-100' : 'opacity-50'}`}>
                 <div className="w-2 h-2 bg-accent rounded-full"></div>
-                <span className="text-xs text-gray-600">OpenWeather</span>
+                <span className="text-xs text-gray-600">Weather</span>
               </div>
             </div>
           </div>
@@ -190,100 +326,178 @@ export default function IndiaMap({ isVisible }: IndiaMapProps) {
         </div>
       </div>
 
-      {/* India Analytics */}
+      {/* Analytics Sidebar */}
       <div className="space-y-6">
-        {/* National Stats */}
-        <Card className="bg-gradient-to-r from-secondary to-green-600 text-white">
-          <CardHeader>
-            <CardTitle className="text-lg">National Solar Statistics</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="text-2xl font-bold">{nationalStats.capacity}</div>
-                <div className="text-green-100 text-sm">Installed Capacity</div>
+        {/* Selected State Details */}
+        {selectedState ? (
+          <Card className="bg-gradient-to-r from-primary to-blue-600 text-white">
+            <CardHeader>
+              <div className="flex items-center space-x-2">
+                <MapPin className="h-5 w-5" />
+                <CardTitle className="text-lg">{selectedState.state.name}</CardTitle>
               </div>
-              <div>
-                <div className="text-2xl font-bold">{nationalStats.target}</div>
-                <div className="text-green-100 text-sm">2030 Target</div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-blue-100">Capital:</span>
+                  <span className="font-medium">{selectedState.state.capital}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-blue-100">Solar Potential:</span>
+                  <Badge variant="secondary" className="bg-white/20 text-white">
+                    {selectedState.state.solarPotential}
+                  </Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-blue-100">Avg. Irradiance:</span>
+                  <span className="font-medium">{selectedState.state.averageSolarIrradiance} kWh/m²/day</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-blue-100">Est. Capacity:</span>
+                  <span className="font-medium">{selectedState.state.estimatedCapacity.toLocaleString()} MW</span>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="bg-gradient-to-r from-secondary to-green-600 text-white">
+            <CardHeader>
+              <CardTitle className="text-lg">India Solar Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-2xl font-bold">{(nationalStats.totalCapacity / 1000).toFixed(1)} GW</div>
+                  <div className="text-green-100 text-sm">Total Capacity</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{nationalStats.avgIrradiance}</div>
+                  <div className="text-green-100 text-sm">Avg Irradiance</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Solar Irradiance Data */}
+        {/* Savings Calculator */}
+        {selectedState?.savings && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center space-x-2">
+                <TrendingUp className="h-4 w-4 text-green-600" />
+                <CardTitle className="text-base">Annual Savings (5kW System)</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Energy Generation</span>
+                <span className="font-semibold text-gray-900">{selectedState.savings.annualEnergyGeneration.toLocaleString()} kWh</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Money Saved</span>
+                <span className="font-semibold text-green-600">{formatMoney(selectedState.savings.annualMoneySaved)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Payback Period</span>
+                <span className="font-semibold text-gray-900">{selectedState.savings.paybackPeriod} years</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">25-Year Savings</span>
+                <span className="font-semibold text-accent">{formatMoney(selectedState.savings.lifetimeSavings)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">CO₂ Reduction</span>
+                <span className="font-semibold text-green-600">{selectedState.savings.co2Reduction.toLocaleString()} kg/year</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Weather Data */}
+        {selectedState?.weatherData && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center space-x-2">
+                <CloudSun className="h-4 w-4 text-blue-600" />
+                <CardTitle className="text-base">Current Weather Impact</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Temperature</span>
+                <span className="font-semibold text-gray-900">{selectedState.weatherData.main?.temp?.toFixed(1)}°C</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Cloud Cover</span>
+                <span className="font-semibold text-gray-900">{selectedState.weatherData.clouds?.all}%</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Humidity</span>
+                <span className="font-semibold text-gray-900">{selectedState.weatherData.main?.humidity}%</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Conditions</span>
+                <span className="font-semibold text-gray-900 capitalize">{selectedState.weatherData.weather?.[0]?.description}</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* PVGIS Data */}
+        {selectedState?.pvgisData && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center space-x-2">
+                <Satellite className="h-4 w-4 text-purple-600" />
+                <CardTitle className="text-base">PVGIS Solar Analysis</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Annual PV Output</span>
+                <span className="font-semibold text-gray-900">
+                  {selectedState.pvgisData.outputs?.totals?.fixed?.["E_y"]?.toFixed(0)} kWh/kWp
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Global Irradiation</span>
+                <span className="font-semibold text-gray-900">
+                  {selectedState.pvgisData.outputs?.totals?.fixed?.["H(i)_y"]?.toFixed(1)} kWh/m²
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Top States Ranking */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Solar Irradiance Analysis</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Average Daily Irradiance</span>
-              <span className="font-semibold text-gray-900">{nationalStats.avgIrradiance}</span>
+            <div className="flex items-center space-x-2">
+              <Zap className="h-4 w-4 text-yellow-600" />
+              <CardTitle className="text-base">Top Solar States</CardTitle>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Peak Month</span>
-              <span className="font-semibold text-gray-900">{nationalStats.peakMonth}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Optimal Tilt Angle</span>
-              <span className="font-semibold text-gray-900">{nationalStats.optimalTilt}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Annual Variability</span>
-              <span className="font-semibold text-gray-900">{nationalStats.variability}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* State-wise Comparison */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Top Solar States</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 bg-primary rounded-full"></div>
-                <span className="text-sm text-gray-900">Rajasthan</span>
-              </div>
-              <span className="text-sm font-semibold text-gray-900">18.4 GW</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 bg-secondary rounded-full"></div>
-                <span className="text-sm text-gray-900">Karnataka</span>
-              </div>
-              <span className="text-sm font-semibold text-gray-900">8.8 GW</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 bg-accent rounded-full"></div>
-                <span className="text-sm text-gray-900">Tamil Nadu</span>
-              </div>
-              <span className="text-sm font-semibold text-gray-900">5.6 GW</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Weather Integration */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Current Weather Impact</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Cloud Cover</span>
-              <span className="font-semibold text-gray-900">{nationalStats.cloudCover}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">UV Index</span>
-              <span className="font-semibold text-gray-900">{nationalStats.uvIndex}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Production Forecast</span>
-              <span className="font-semibold text-secondary">{nationalStats.forecastProduction}</span>
-            </div>
+            {INDIA_STATES
+              .filter(state => state.solarPotential === 'High')
+              .slice(0, 5)
+              .map((state, index) => (
+                <div key={state.name} className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-3 h-3 rounded-full ${
+                      index === 0 ? 'bg-yellow-500' :
+                      index === 1 ? 'bg-gray-400' :
+                      index === 2 ? 'bg-orange-600' :
+                      'bg-green-500'
+                    }`}></div>
+                    <span className="text-sm text-gray-900">{state.name}</span>
+                  </div>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {(state.estimatedCapacity / 1000).toFixed(1)} GW
+                  </span>
+                </div>
+              ))}
           </CardContent>
         </Card>
       </div>
